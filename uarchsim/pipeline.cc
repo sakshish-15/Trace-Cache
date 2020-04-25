@@ -75,7 +75,9 @@ pipeline_t::pipeline_t(
 ):
   processor_t(_sim,_mmu,_id),
   statsModule(this),
-  BPU(fetch_width, 3, 8192, 4, 20, 16, 20, 16, 64, 512),
+  //BPU(fetch_width, 3, 8192, 4, 20, 16, 20, 16, 64, 512),
+  // Sakshi- changed the cond branch per cycle
+  BPU(fetch_width, COND_BR_PER_CYC, 8192, 4, 20, 16, 20, 16, 64, 512),
   FQ(fq_size,this),
   IQ(iq_size,iq_num_parts,this),
   LSU(lq_size, sq_size, Tid, _mmu, this)

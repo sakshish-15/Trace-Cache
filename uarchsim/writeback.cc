@@ -52,6 +52,10 @@ void pipeline_t::writeback(unsigned int lane_number) {
             // The simulator is running in perfect branch prediction mode, therefore, all branches are correctly predicted.
             // The assertion immediately above confirms that the prediction (next_pc is the predicted target)
             // matches the outcome (c_next_pc is the calculated target).
+		REN->resolve( PAY.buf[index].AL_index,
+			      PAY.buf[index].branch_ID,
+			      true
+			      );
             //
             // Tips:
             // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
@@ -74,6 +78,13 @@ void pipeline_t::writeback(unsigned int lane_number) {
             // The simulator is running in real branch prediction mode, and the branch was correctly predicted.
             // You can see this in the comparison above: the prediction (next_pc is the predicted target)
             // matches the outcome (c_next_pc is the calculated target).
+		REN->resolve( PAY.buf[index].AL_index,
+			      PAY.buf[index].branch_ID,
+			      true
+			      );
+		resolve(PAY.buf[index].branch_ID,
+			true
+			);
             //
             // Tips:
             // 1. See #15a, item 1.
@@ -92,7 +103,7 @@ void pipeline_t::writeback(unsigned int lane_number) {
             // Branch was mispredicted.
 
             // Roll-back the fetch unit: PC and branch predictor.
-            pc = PAY.buf[index].c_next_pc;					// PC gets the correct target of the resolved branch.
+            pc = PAY.buf[index].c_next_pc;
             BPU.mispredict(PAY.buf[index].pred_tag,                             // Roll-back the branch predictor to the point of the resolved branch.
                            (PAY.buf[index].c_next_pc != INCREMENT_PC(PAY.buf[index].pc)),
                            PAY.buf[index].c_next_pc);
@@ -114,6 +125,10 @@ void pipeline_t::writeback(unsigned int lane_number) {
             // * Squash instructions in the pipeline that are logically after the branch. You will do this too, in #15d below.
             //
             // Restore the RMT, FL, and AL.
+		REN->resolve( PAY.buf[index].AL_index,
+			      PAY.buf[index].branch_ID,
+			      false
+			      );
             //
             // Tips:
             // 1. See #15a, item 1.
@@ -127,6 +142,9 @@ void pipeline_t::writeback(unsigned int lane_number) {
 
             // FIX_ME #15d
             // Squash instructions after the branch in program order, in all pipeline registers and the IQ.
+		resolve(PAY.buf[index].branch_ID,
+			false
+			);
             //
             // Tips:
             // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
@@ -147,6 +165,7 @@ void pipeline_t::writeback(unsigned int lane_number) {
       //////////////////////////////////////////////////////////////////////////////////////////////////////////
       // FIX_ME #16
       // Set completed bit in Active List.
+	REN->set_complete(PAY.buf[index].AL_index);
       //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).

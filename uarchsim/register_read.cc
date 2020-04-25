@@ -14,7 +14,7 @@ void pipeline_t::register_read(unsigned int lane_number) {
 
       //////////////////////////////////////////////////////////////////////////////////////////////////////////
       // FIX_ME #11a
-      // If the instruction has a destination register AND its latency is 1-cycle AND it is not a load:
+      // If the instruction has a destination register AND its latency is 1-cycle AND it is not a load AND it is not an AMO instruction:
       // (1) Broadcast its destination tag to the IQ to wakeup its dependent instructions.
       // (2) Set the corresponding ready bit in the Physical Register File Ready Bit Array.
       //
@@ -24,10 +24,15 @@ void pipeline_t::register_read(unsigned int lane_number) {
       // their data are available, because they may stall in the Execute Stage. I.e., in the current
       // simulator implementation, loads do NOT speculatively wakeup their dependent instructions.
       //
+      // Atomic memory instructions (AMO) that perform compute (load-compute-store) and have
+      // a destination register, must not perform wakeup at all. They execute at retire, followed
+      // by a full squash.
+      //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
       // 2. The easiest way to tell if this instruction is a load or not, is to test the instruction's
       //    flags (in its payload) via the IS_LOAD() macro (see pipeline.h).
+      //    Similarly, the IS_AMO() macro is for testing AMO status.
       // 3. The instruction's latency is provided for you as "lat" below: it's the number of
       //    Execute Stages within the lane (lane::ex_depth).
       //    Single-cycle producers must perform wakeup here.
@@ -40,12 +45,20 @@ void pipeline_t::register_read(unsigned int lane_number) {
       //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       unsigned int lat = Execution_Lanes[lane_number].ex_depth;
-
-
+	if ((PAY.buf[index].C_valid == true) && (lat == 1) && (IS_LOAD(PAY.buf[index].flags) == false)&& (IS_AMO(PAY.buf[index].flags) == false)) {
+		IQ.wakeup(PAY.buf[index].C_phys_reg);
+		REN->set_ready(PAY.buf[index].C_phys_reg);
+	}
 
       //////////////////////////////////////////////////////////////////////////////////////////////////////////
       // FIX_ME #12
       // Read source register(s) from the Physical Register File.
+	if (PAY.buf[index].A_valid == true)
+		PAY.buf[index].A_value.dw = REN->read(PAY.buf[index].A_phys_reg);
+	if (PAY.buf[index].B_valid == true)
+		PAY.buf[index].B_value.dw = REN->read(PAY.buf[index].B_phys_reg);
+	if (PAY.buf[index].D_valid == true)
+		PAY.buf[index].D_value.dw = REN->read(PAY.buf[index].D_phys_reg);
       //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).

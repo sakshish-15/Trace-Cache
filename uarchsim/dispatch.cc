@@ -34,7 +34,8 @@ void pipeline_t::dispatch() {
    // * If the Active List does not have enough entries for the *whole* dispatch bundle (which is always comprised of 'dispatch_width' instructions),
    //   then stall the Dispatch Stage. Stalling is achieved by returning from this function ('return').
    // * Else, don't stall the Dispatch Stage. This is achieved by doing nothing and proceeding to the next statements.
-
+	if (REN->stall_dispatch(dispatch_width) == true)
+		return;
 
 
    //
@@ -108,27 +109,48 @@ void pipeline_t::dispatch() {
       //       has a destination register.
       //    b. load: You can efficiently detect loads by testing the instruction's flags with the IS_LOAD() macro,
       //       as shown below. Use the local variable 'load_flag' (already declared):
-      //       load_flag = IS_LOAD(PAY.buf[index].flags);
+             load_flag = IS_LOAD(PAY.buf[index].flags);
       //    c. store: You can efficiently detect stores by testing the instruction's flags with the IS_STORE() macro,
       //       as shown below. Use the local variable 'store_flag' (already declared):
-      //       store_flag = IS_STORE(PAY.buf[index].flags);
+             store_flag = IS_STORE(PAY.buf[index].flags);
       //    d. branch: You can efficiently detect branches by testing the instruction's flags with the IS_BRANCH() macro,
       //       as shown below. Use the local variable 'branch_flag' (already declared):
-      //       branch_flag = IS_BRANCH(PAY.buf[index].flags);
+             branch_flag = IS_BRANCH(PAY.buf[index].flags);
       //    e. amo: You can efficiently detect atomic memory operations by testing the instruction's flags with the IS_AMO() macro,
       //       as shown below. Use the local variable 'amo_flag' (already declared):
-      //       amo_flag = IS_AMO(PAY.buf[index].flags);
+             amo_flag = IS_AMO(PAY.buf[index].flags);
       //    f. csr: You can efficiently detect system instructions by testing the instruction's flags with the IS_CSR() macro,
       //       as shown below. Use the local variable 'csr_flag' (already declared):
-      //       csr_flag = IS_CSR(PAY.buf[index].flags);
+             csr_flag = IS_CSR(PAY.buf[index].flags);
       // 3. When you dispatch the instruction into the Active List, remember to *update* the instruction's
       //    payload with its Active List index.
-
+	PAY.buf[index].AL_index = REN->dispatch_inst(PAY.buf[index].C_valid,
+						     PAY.buf[index].C_log_reg,
+						     PAY.buf[index].C_phys_reg,
+						     load_flag,
+						     store_flag,
+						     branch_flag,
+						     amo_flag,
+						     csr_flag,
+						     PAY.buf[index].pc
+						     );
 
 
       // FIX_ME #8
       // Determine initial ready bits for the instruction's three source registers.
       // These will be used to initialize the instruction's ready bits in the Issue Queue.
+	if (PAY.buf[index].A_valid == true)
+		A_ready = REN->is_ready(PAY.buf[index].A_phys_reg);
+	else
+		A_ready = true;
+	if (PAY.buf[index].B_valid == true)
+		B_ready = REN->is_ready(PAY.buf[index].B_phys_reg);
+	else
+		B_ready = true;
+	if (PAY.buf[index].D_valid == true)
+		D_ready = REN->is_ready(PAY.buf[index].D_phys_reg);
+	else
+		D_ready = true;
       //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
@@ -146,6 +168,8 @@ void pipeline_t::dispatch() {
       // FIX_ME #9
       // Clear the ready bit of the instruction's destination register.
       // This is needed to synchronize future consumers.
+	if (PAY.buf[index].C_valid == true)
+		REN->clear_ready(PAY.buf[index].C_phys_reg);
       //
       // (TANGENT: Alternatively, this could be done when the physical register is freed. This would
       // ensure newly-allocated physical registers are initially marked as not-ready, obviating the
@@ -177,6 +201,11 @@ void pipeline_t::dispatch() {
          case SEL_IQ:
             // FIX_ME #10a
             // Dispatch the instruction into the IQ.
+		IQ.dispatch(index, DISPATCH[i].branch_mask, PAY.buf[index].lane_id,
+			    PAY.buf[index].A_valid, A_ready, PAY.buf[index].A_phys_reg,
+			    PAY.buf[index].B_valid, B_ready, PAY.buf[index].B_phys_reg,
+			    PAY.buf[index].D_valid, D_ready, PAY.buf[index].D_phys_reg
+			    );
             //
             // Tips:
             // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
@@ -206,7 +235,7 @@ void pipeline_t::dispatch() {
             // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
 
             // *** FIX_ME #10b (part 1): Set completed bit in Active List.
-
+		REN->set_complete(PAY.buf[index].AL_index);
 
         
             // Check if this is a NOP with a fetch exception.
@@ -220,6 +249,7 @@ void pipeline_t::dispatch() {
                PAY.buf[index].trap = t;
 
                // *** FIX_ME #10b (part 2): Set exception bit in Active List.
+		REN->set_exception(PAY.buf[index].AL_index);
 
 
 
@@ -236,6 +266,8 @@ void pipeline_t::dispatch() {
             // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
 
             // *** FIX_ME #10c: Set both the completed bit and the exception bit in the Active List.
+		REN->set_complete(PAY.buf[index].AL_index);
+		REN->set_exception(PAY.buf[index].AL_index);
 
 
  

@@ -229,6 +229,11 @@ int main(int argc, char** argv)
   parser.option(0, "lsq" , 1, [&](const char* s){LQ_SIZE = atoi(s);SQ_SIZE = atoi(s);});
   parser.option(0, "disambig", 1, [&](const char* s){set_disambig_flags(s);});
   parser.option(0, "fw"  , 1, [&](const char* s){FETCH_WIDTH = atoi(s);});
+  parser.option(0, "tc_fot"  , 1, [&](const char* s){FILL_ON_TAKEN_BRANCH = atoi(s);});
+  parser.option(0, "tc_cth"  , 1, [&](const char* s){CLEAR_TCM_AT_HIT = atoi(s);});
+  parser.option(0, "tcl"  , 1, [&](const char* s){TCM_LINES = atoi(s);});
+  parser.option(0, "tca"  , 1, [&](const char* s){TCM_ASSOC = atoi(s);});
+  parser.option(0, "cbr"  , 1, [&](const char* s){COND_BR_PER_CYC = atoi(s);});
   parser.option(0, "dw"  , 1, [&](const char* s){DISPATCH_WIDTH = atoi(s);});
   parser.option(0, "iw"  , 1, [&](const char* s){ISSUE_WIDTH = atoi(s);});
   parser.option(0, "rw"  , 1, [&](const char* s){RETIRE_WIDTH = atoi(s);});

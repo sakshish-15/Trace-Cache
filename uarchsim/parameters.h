@@ -25,6 +25,12 @@ extern unsigned int FETCH_WIDTH;
 extern unsigned int DISPATCH_WIDTH;
 extern unsigned int ISSUE_WIDTH;
 extern unsigned int RETIRE_WIDTH;
+//tcm parameters
+extern unsigned int FILL_ON_TAKEN_BRANCH;
+extern unsigned int CLEAR_TCM_AT_HIT;
+extern unsigned int TCM_LINES;
+extern unsigned int TCM_ASSOC;
+extern unsigned int COND_BR_PER_CYC;
 extern bool         IC_INTERLEAVED;
 extern bool         IC_SINGLE_BB;		// not used currently
 extern bool         IN_ORDER_ISSUE;		// not used currently

@@ -1,14 +1,7 @@
 #include <inttypes.h>
-#include "assert.h"
 
 class renamer {
-	private:
-	int head_free_list , tail_free_list ;
-	int head_active_list, tail_active_list;
-	int size_free_entry_active_list, size_free_entry_free_list;
-	uint64_t n_branches, n_log_regs, n_phys_regs;
-	uint64_t size_free_list ;
-	uint64_t size_active_list;
+private:
 	/////////////////////////////////////////////////////////////////////
 	// Put private class variables here.
 	/////////////////////////////////////////////////////////////////////
@@ -17,18 +10,12 @@ class renamer {
 	// Structure 1: Rename Map Table
 	// Entry contains: physical register mapping
 	/////////////////////////////////////////////////////////////////////
-
 	uint64_t* RMT;
-	
-
 	/////////////////////////////////////////////////////////////////////
 	// Structure 2: Architectural Map Table
 	// Entry contains: physical register mapping
 	/////////////////////////////////////////////////////////////////////
-
 	uint64_t* AMT;
-
-
 	/////////////////////////////////////////////////////////////////////
 	// Structure 3: Free List
 	//
@@ -38,9 +25,9 @@ class renamer {
 	// * Structure includes head, tail, and possibly other variables
 	//   depending on your implementation.
 	/////////////////////////////////////////////////////////////////////
-
-	uint64_t* Free_list;
-
+	uint64_t* FL;
+	uint64_t FL_head, FL_tail;
+	bool FL_full;
 	/////////////////////////////////////////////////////////////////////
 	// Structure 4: Active List
 	//
@@ -80,29 +67,25 @@ class renamer {
 	// * Structure includes head, tail, and possibly other variables
 	//   depending on your implementation.
 	/////////////////////////////////////////////////////////////////////
-
-
-	struct active_list_struct
-	{
-		//int head;
-		//int tail;
-		bool dest_flag;
-		uint64_t log_reg_num_dest;
-		uint64_t phys_reg_num_dest;
-		bool completed_bit;
-		bool exception_bit;
-		bool load_violation_bit;
-		bool branch_misprediction_bit;
-		bool value_misprediction_bit;
-		bool load_flag;
-		bool store_flag;
-		bool branch_flag;
+	struct active_list {
+		bool dst_flag;
+		uint64_t dest_l_reg;
+		uint64_t dest_p_reg;
+		bool comp;
+		bool excp;
+		bool ld_vio;
+		bool br_mis;
+		bool val_mis;
+		bool ld_flag;
+		bool st_flag;
+		bool br_flag;
 		bool amo_flag;
 		bool csr_flag;
 		uint64_t PC;
-
 	};
-
+	struct active_list* AL;
+	uint64_t AL_head, AL_tail;
+	bool AL_empty;
 	/////////////////////////////////////////////////////////////////////
 	// Structure 5: Physical Register File
 	// Entry contains: value
@@ -111,25 +94,12 @@ class renamer {
 	// * The value must be of the following type: uint64_t
 	//   (#include <inttypes.h>, already at top of this file)
 	/////////////////////////////////////////////////////////////////////
-
-	uint64_t* Physical_Reg_File;
-
-		
-		
-		
-
-
+	uint64_t* PRF;
 	/////////////////////////////////////////////////////////////////////
 	// Structure 6: Physical Register File Ready Bit Array
 	// Entry contains: ready bit
 	/////////////////////////////////////////////////////////////////////
-
-	//struct PRF_ready_array
-	//{
-	//	uint64_t ready;
-
-	//};
-
+	bool* PRF_ready;
 	/////////////////////////////////////////////////////////////////////
 	// Structure 7: Global Branch Mask (GBM)
 	//
@@ -168,7 +138,6 @@ class renamer {
 	// 1 to 64.
 	/////////////////////////////////////////////////////////////////////
 	uint64_t GBM;
-
 	/////////////////////////////////////////////////////////////////////
 	// Structure 8: Branch Checkpoints
 	//
@@ -177,29 +146,21 @@ class renamer {
 	// 2. checkpointed Free List head index
 	// 3. checkpointed GBM
 	/////////////////////////////////////////////////////////////////////
-
-	typedef struct 
-	{
-		uint64_t* Shadow_Map_Table;
-		int Checkpointed_Free_list_head_index;
-		uint64_t Checkpointed_GBM;
-	}	Branch_Checkpoint_struct;
-
-	Branch_Checkpoint_struct* Branch_Checkpoint;
-
-		active_list_struct* Active_list;
-		
-		bool* PRF_ready_array;
-		
-
-
-
-	
+	struct branch_checkpoint {
+		uint64_t* RMT;
+		uint64_t FL_head;
+		uint64_t GBM;
+	};
+	struct branch_checkpoint* BC;
 	/////////////////////////////////////////////////////////////////////
 	// Private functions.
 	// e.g., a generic function to copy state from one map to another.
 	/////////////////////////////////////////////////////////////////////
-
+	uint64_t log_regs, phy_regs, branches, fl_regs;
+	void set_AL_empty ();
+	void reset_AL_empty ();
+	void set_FL_full ();
+	void reset_FL_full ();
 public:
 	////////////////////////////////////////
 	// Public functions.
@@ -221,16 +182,17 @@ public:
 	// Then, initialize the data structures based on the knowledge
 	// that the pipeline is intially empty (no in-flight instructions yet).
 	/////////////////////////////////////////////////////////////////////
-	renamer(uint64_t n_log_regs, uint64_t n_phys_regs,uint64_t n_branches);
+	renamer(uint64_t n_log_regs,
+		uint64_t n_phys_regs,
+		uint64_t n_branches);
 
-	
 	/////////////////////////////////////////////////////////////////////
 	// This is the destructor, used to clean up memory space and
 	// other things when simulation is done.
 	// I typically don't use a destructor; you have the option to keep
 	// this function empty.
 	/////////////////////////////////////////////////////////////////////
-	//~renamer();
+	~renamer();
 
 
 	//////////////////////////////////////////

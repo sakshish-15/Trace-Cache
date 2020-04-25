@@ -20,6 +20,7 @@ void pipeline_t::retire(size_t& instret) {
    // * The precommit() function returns 'true' if there is a head instruction (active list not empty)
    //   and 'false' otherwise (active list empty).
    // * The precommit() function also modifies arguments that THIS function must examine and act upon.
+	head_valid = REN->precommit(completed, exception, load_viol, br_misp, val_misp, load, store, branch, amo, csr, offending_PC);
    //
    // Tips:
    // 1. Call the renamer module's precommit() function with the following arguments in this order:
@@ -85,7 +86,7 @@ void pipeline_t::retire(size_t& instret) {
          // FIX_ME #17b
 	 // Commit the instruction at the head of the active list.
 	 //
-
+		REN->commit();
 
          // If the committed instruction is a branch, signal the branch predictor to commit its oldest branch.
          if (branch && !PERFECT_BRANCH_PRED) {
@@ -303,6 +304,8 @@ bool pipeline_t::execute_amo() {
 
    // Write the loaded value to the destination physical register.
    assert(PAY.buf[index].C_valid);
+   IQ.wakeup(PAY.buf[index].C_phys_reg);	// Doing wakeup purely out of principle. It's not needed because there will be a full squash after this amo.
+   REN->set_ready(PAY.buf[index].C_phys_reg);
    REN->write(PAY.buf[index].C_phys_reg, PAY.buf[index].C_value.dw);
 
    return(exception);

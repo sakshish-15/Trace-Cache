@@ -3,7 +3,7 @@
 #include "decode.h"
 #include "config.h"
 
-#include "btb.h"
+#include "tcm.h"
 #include "bq.h"
 #include "gshare.h"
 #include "ras.h"
@@ -28,6 +28,9 @@ private:
 	// fetch bundle among multiple choices.
 	btb_t btb;
 	
+	tcm_t tcm;
+	uint64_t tc_hit_cnt; // stats counter
+	uint64_t tc_diff_bun; // stats counter
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// FIX_ME #TRACECACHE
 	//
@@ -76,6 +79,12 @@ private:
 	uint64_t meas_jumpind_m;	// # mispredicted jumps, indirect
 	uint64_t meas_callind_m;	// # mispredicted calls, indirect
 	uint64_t meas_jumpret_m;	// # mispredicted jumps, return
+	
+	uint64_t lfb_pc;
+	uint64_t lfb_cb_predictions;
+	uint64_t lfb_fetch_bundle_length;
+	uint64_t lfb_next_pc;
+	btb_output_t lfb_fetch_bundle[MAX_BTB_BANKS];
 
 public:
 	bpu_t(uint64_t instr_per_cycle,				// "n"
@@ -131,7 +140,7 @@ public:
 	// 1. Roll-back the branch queue to the head entry.
 	// 2. Restore checkpointed global histories and the RAS (as best we can for RAS).
 	void flush();
-
+	void trace_constructor (bool valid_fetch_bundle, bool tcm_hit);
 	// Output all branch prediction measurements.
 	void output(uint64_t num_instr, FILE *fp);
 };

@@ -25,6 +25,12 @@ uint32_t FETCH_WIDTH	    = 8;//2;//4;
 uint32_t DISPATCH_WIDTH	  = 8;//2;//4;
 uint32_t ISSUE_WIDTH	    = 8;//3;//8;
 uint32_t RETIRE_WIDTH	    = 8;//1;//4;
+//tcm parameters
+uint32_t FILL_ON_TAKEN_BRANCH	= 0;
+uint32_t CLEAR_TCM_AT_HIT	= 0;
+uint32_t TCM_LINES		= 128;
+uint32_t TCM_ASSOC		= 1;
+uint32_t COND_BR_PER_CYC	= 3;
 bool IC_INTERLEAVED		    = false;
 bool IC_SINGLE_BB		      = false;	// not used currently
 bool IN_ORDER_ISSUE		    = false;	// not used currently

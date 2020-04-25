@@ -92,7 +92,6 @@ void pipeline_t::fetch() {
    }
    else {
       pred_valid = true;
-
       fetch_pred_tag = BPU.predict(pc, pred_tags, tc_hit, fetch_bundle_length, branch_vector, pred_vector, next_fetch_pc);
       assert(fetch_bundle_length <= fetch_width);
 
@@ -357,5 +356,6 @@ void pipeline_t::fetch() {
       else {
          assert(pc == next_fetch_pc);
       }
+      BPU.trace_constructor(!btb_miss, tc_hit); //call trace cache line fill buffer
    }
 }			// fetch()

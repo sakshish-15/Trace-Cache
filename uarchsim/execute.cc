@@ -45,6 +45,11 @@ void pipeline_t::execute(unsigned int lane_number) {
             // (2) Set the corresponding ready bit in the Physical Register File Ready Bit Array.
             // (3) Write the value into the Physical Register File. Doing this here, instead of in WB,
             //     properly simulates the bypass network.
+		if (hit == true) {
+			IQ.wakeup(PAY.buf[index].C_phys_reg);
+			REN->set_ready(PAY.buf[index].C_phys_reg);
+			REN->write(PAY.buf[index].C_phys_reg, PAY.buf[index].C_value.dw);
+		}
             //
             // If it didn't hit, it will get replayed later from within the LSU ("load_replay").
             //
@@ -144,6 +149,8 @@ void pipeline_t::execute(unsigned int lane_number) {
          //    via the code above) into the Physical Register File.
          //    Note: Values in the payload use a union type (can be referenced as either a single doubleword or as two words
          //    separately); see the comments in file payload.h regarding referencing a value as a single doubleword.
+	if (PAY.buf[index].C_valid == true)
+		REN->write(PAY.buf[index].C_phys_reg, PAY.buf[index].C_value.dw);
 
 
 
@@ -186,7 +193,7 @@ void pipeline_t::execute(unsigned int lane_number) {
          // second-to-last sub-stage, which is the equivalent of the Register Read stage
 	 // in the case of a single-cycle producer -- in terms of wakeup timing.
          //
-         // If the "depth-1" instruction has a destination register AND it is not a load:
+         // If the "depth-1" instruction has a destination register AND it is not a load AND it is not an AMO instruction:
          // (1) Broadcast its destination tag to the IQ to wakeup its dependent instructions.
          // (2) Set the corresponding ready bit in the Physical Register File Ready Bit Array.
 	 //
@@ -194,10 +201,15 @@ void pipeline_t::execute(unsigned int lane_number) {
          // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
          // 2. The easiest way to tell if this instruction is a load or not, is to test the instruction's
          //    flags (in its payload) via the IS_LOAD() macro (see pipeline.h).
+         //    Similarly, the IS_AMO() macro is for testing AMO status.
          // 3. If the instruction has a destination register AND it is not a load, then:
          //    a. Wakeup dependents in the IQ using its wakeup() port (see issue_queue.h for arguments
          //       to the wakeup port).
          //    b. Set the destination register's ready bit.
+	if ((PAY.buf[index].C_valid == true) && (IS_LOAD(PAY.buf[index].flags) == false) && (IS_AMO(PAY.buf[index].flags) == false)){
+		IQ.wakeup(PAY.buf[index].C_phys_reg);
+		REN->set_ready(PAY.buf[index].C_phys_reg);
+	}
 
       }
    }
@@ -247,6 +259,9 @@ void pipeline_t::load_replay() {
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
       // 2. See #13 (in execute.cc), and implement steps 3a,3b,3c.
+		IQ.wakeup(PAY.buf[index].C_phys_reg);
+		REN->set_ready(PAY.buf[index].C_phys_reg);
+		REN->write(PAY.buf[index].C_phys_reg, PAY.buf[index].C_value.dw);
 
 
 
@@ -256,6 +271,7 @@ void pipeline_t::load_replay() {
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
       // 2. Set the completed bit for this instruction in the Active List.
+	REN->set_complete(PAY.buf[index].AL_index);
 
 
 

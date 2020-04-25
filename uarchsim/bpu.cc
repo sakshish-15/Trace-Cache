@@ -2,7 +2,7 @@
 #include <inttypes.h>
 #include <assert.h>
 #include "bpu.h"
-//#include "parameters.h"
+#include "parameters.h"
 
 bpu_t::bpu_t(uint64_t instr_per_cycle,				// "n"
 	     uint64_t cond_branch_per_cycle,			// "m"
@@ -15,6 +15,7 @@ bpu_t::bpu_t(uint64_t instr_per_cycle,				// "n"
 	    ):instr_per_cycle(instr_per_cycle),
 	      cond_branch_per_cycle(cond_branch_per_cycle),
 	      btb(btb_entries, instr_per_cycle, btb_assoc, cond_branch_per_cycle),	// construct the branch target buffer (btb)
+              tcm(TCM_LINES,TCM_ASSOC,instr_per_cycle, cond_branch_per_cycle),
 	      cb_index(cb_pc_length, cb_bhr_length),		// construct gshare index function of conditional branch (cb) predictor
               ib_index(ib_pc_length, ib_bhr_length),		// construct gshare index function of indirect branch (ib) predictor
               ras(ras_size),					// construct return address stack (ras)
@@ -42,6 +43,8 @@ bpu_t::bpu_t(uint64_t instr_per_cycle,				// "n"
    meas_jumpind_m = 0;	// # mispredicted jumps, indirect
    meas_callind_m = 0;	// # mispredicted calls, indirect
    meas_jumpret_m = 0;	// # mispredicted jumps, return
+   tc_hit_cnt = 0;
+   tc_diff_bun = 0;
 }
 
 bpu_t::~bpu_t() {
@@ -103,6 +106,9 @@ uint64_t bpu_t::predict(uint64_t pc, uint64_t pred_tags[], bool &tc_hit, uint64_
    uint64_t ib_predicted_target;		  // predicted target from the indirect branch predictor
    uint64_t ras_predicted_target;		  // predicted target from the return address stack (only popped if fetch bundle ends in a return)
    btb_output_t btb_fetch_bundle[MAX_BTB_BANKS];  // BTB's output for the fetch bundle.
+   uint64_t tcm_fetch_bundle_length;
+   btb_output_t tcm_fetch_bundle[MAX_BTB_BANKS];  // TCM's output for the fetch bundle.
+   uint64_t tcm_next_pc;
 
    // Get "m" predictions from the conditional branch predictor.
    // "m" two-bit counters are packed into a uint64_t.
@@ -148,7 +154,24 @@ uint64_t bpu_t::predict(uint64_t pc, uint64_t pred_tags[], bool &tc_hit, uint64_
 
    // tc_hit = tcm.lookup(pc, cb_predictions, fetch_bundle_length, btb_fetch_bundle, next_pc);
    tc_hit = false;
- 
+   if (cond_branch_per_cycle > 1) {
+      if (tcm.lookup(pc, cb_predictions, tcm_fetch_bundle_length, tcm_fetch_bundle, tcm_next_pc)) {
+         tc_hit = true;
+         if (fetch_bundle_length < tcm_fetch_bundle_length)
+            tc_diff_bun++;
+         fetch_bundle_length = tcm_fetch_bundle_length;
+         for (uint64_t i = 0; i < tcm_fetch_bundle_length; i++)
+            btb_fetch_bundle[i] = tcm_fetch_bundle[i];
+         next_pc = tcm_next_pc;
+         tc_hit_cnt++;
+      }
+   }
+   lfb_pc = pc;
+   lfb_cb_predictions = cb_predictions;
+   lfb_fetch_bundle_length = fetch_bundle_length;
+   for (uint64_t i = 0; i < fetch_bundle_length; i++)
+      lfb_fetch_bundle[i] = btb_fetch_bundle[i];
+   lfb_next_pc = next_pc;
    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
    // 1. Push entries into the branch queue, for all of the branches in the predicted fetch bundle.
    // 2. Update global histories and the RAS.
@@ -375,6 +398,9 @@ void bpu_t::mispredict(uint64_t branch_pred_tag, bool taken, uint64_t next_pc) {
    // 4. Note that the branch was mispredicted (for measuring mispredictions at retirement).
 
    bq.bq[pred_tag].misp = true;
+
+	// 5. clear the line fill buffer as the previous pc != next pc				
+	tcm.clear_line_fill();
 }
 
 
@@ -490,6 +516,22 @@ void bpu_t::flush() {
    cb_index.set_bhr(bq.bq[pred_tag].precise_cb_bhr);
    ib_index.set_bhr(bq.bq[pred_tag].precise_ib_bhr);
    ras.set_tos(bq.bq[pred_tag].precise_ras_tos);
+   tcm.clear_line_fill();
+}
+
+void bpu_t::trace_constructor (bool valid_fetch_bundle, bool tcm_hit){
+	if (valid_fetch_bundle){
+		if (cond_branch_per_cycle > 1) {
+			if (CLEAR_TCM_AT_HIT == 1) {
+				if (tcm_hit)
+					tcm.clear_line_fill();
+				else
+					tcm.line_fill_buffer (lfb_pc, lfb_cb_predictions, lfb_fetch_bundle_length, lfb_fetch_bundle, lfb_next_pc);
+			}
+			else
+				tcm.line_fill_buffer (lfb_pc, lfb_cb_predictions, lfb_fetch_bundle_length, lfb_fetch_bundle, lfb_next_pc);
+		}
+	}
 }
 
 
@@ -510,5 +552,6 @@ void bpu_t::output(uint64_t num_instr, FILE *fp) {
    BP_OUTPUT(fp, "Jump Indirect    ", meas_jumpind_n, meas_jumpind_m, num_instr);
    BP_OUTPUT(fp, "Call Indirect    ", meas_callind_n, meas_callind_m, num_instr);
    BP_OUTPUT(fp, "Return           ", meas_jumpret_n, meas_jumpret_m, num_instr);
+   BP_OUTPUT(fp, "TCM hit count    ", tc_hit_cnt, tc_diff_bun, (uint64_t)0);
 }
 

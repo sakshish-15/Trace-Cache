@@ -43,6 +43,8 @@ void pipeline_t::rename1() {
 void pipeline_t::rename2() {
    unsigned int i;
    unsigned int index;
+   uint64_t bundle_branch = 0;
+   uint64_t bundle_dst = 0;
 
 
    // Stall the rename2 sub-stage if either:
@@ -65,6 +67,10 @@ void pipeline_t::rename2() {
       // Count the number of instructions in the rename bundle that have a destination register.
       // With these counts, you will be able to query the renamer for resource availability
       // (checkpoints and physical registers).
+	if (PAY.buf[index].checkpoint == true)
+		bundle_branch++;
+	if (PAY.buf[index].C_valid == true)
+		bundle_dst++;
       //
       // Tips:
       // 1. The loop construct, for iterating through all instructions in the rename bundle (0 to dispatch_width),
@@ -82,6 +88,10 @@ void pipeline_t::rename2() {
    // Check if the Rename2 Stage must stall due to any of the following conditions:
    // * Not enough free checkpoints.
    // * Not enough free physical registers.
+	if (REN->stall_branch(bundle_branch) == true)
+		return;
+	if (REN->stall_reg(bundle_dst) == true)
+		return;
    //
    // If there are not enough resources for the *whole* rename bundle, then stall the Rename2 Stage.
    // Stalling is achieved by returning from this function ('return').
@@ -99,6 +109,14 @@ void pipeline_t::rename2() {
 
       // FIX_ME #3
       // Rename source registers (first) and destination register (second).
+	if (PAY.buf[index].A_valid == true)
+		PAY.buf[index].A_phys_reg = REN->rename_rsrc(PAY.buf[index].A_log_reg);
+	if (PAY.buf[index].B_valid == true)
+		PAY.buf[index].B_phys_reg = REN->rename_rsrc(PAY.buf[index].B_log_reg);
+	if (PAY.buf[index].D_valid == true)
+		PAY.buf[index].D_phys_reg = REN->rename_rsrc(PAY.buf[index].D_log_reg);
+	if (PAY.buf[index].C_valid == true)
+		PAY.buf[index].C_phys_reg = REN->rename_rdst(PAY.buf[index].C_log_reg);
       //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).
@@ -114,6 +132,7 @@ void pipeline_t::rename2() {
 
       // FIX_ME #4
       // Get the instruction's branch mask.
+	RENAME2[i].branch_mask = REN->get_branch_mask();
       //
       // Tips:
       // 1. Every instruction gets a branch_mask. An instruction needs to know which branches it depends on, for possible squashing.
@@ -127,6 +146,8 @@ void pipeline_t::rename2() {
 
       // FIX_ME #5
       // If this instruction requires a checkpoint (most branches), then create a checkpoint.
+	if (PAY.buf[index].checkpoint == true)
+		PAY.buf[index].branch_ID = REN->checkpoint();
       //
       // Tips:
       // 1. At this point of the code, 'index' is the instruction's index into PAY.buf[] (payload).

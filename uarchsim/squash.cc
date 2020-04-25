@@ -51,7 +51,7 @@ void pipeline_t::squash_complete(reg_t jump_PC) {
         // FIX_ME #17c
         // Squash the renamer.
         //
-
+	REN->squash();
 
 	//////////////////////////
 	// Dispatch Stage

@@ -1,5 +1,5 @@
-#include "btb.h"
 
+#include "btb.h"
 #define MAX_TCM_BUNDLE 16
 
 
@@ -12,11 +12,12 @@ struct {
    uint64_t lru;
    uint64_t br_flags;
    uint64_t br_mask;
+   uint64_t ends_in_br;
 
    // Payload.
    uint64_t tcm_bundle_length; //length of the trace cache bundle
    btb_output_t tcm_fetch_bundle[MAX_TCM_BUNDLE]; // TCM's output for the fetch bundle.
-   uint64_t next_pc; //equal to pc for the next fetch bundle
+   uint64_t fall_thru_pc; //equal to pc incremented by fetch bundle width BUG_FIX
 } tcm_entry_t;
 
 
@@ -24,6 +25,8 @@ class tcm_t {
 private:
 	// The trace cache has 2 dimensions: number of sets and number of ways per set (associativity)
 	tcm_entry_t **tcm;
+	uint64_t cond_branch_per_cycle;
+	uint64_t num_instr_per_cycle;
 	uint64_t sets;
 	uint64_t assoc;
 
@@ -55,12 +58,11 @@ private:
 
 	bool search(uint64_t pc, uint64_t cb_predictions, uint64_t &set, uint64_t &way);
 	void update_lru(uint64_t set, uint64_t way);
-	btb_branch_type_e decode(insn_t insn);
-	void checkpoint_line_fill();
+	//void checkpoint_line_fill();
 	
 
 public:
-	tcm_t(uint64_t num_entries, uint64_t assoc, uint64_t cond_branch_per_cycle);
+	tcm_t(uint64_t num_entries, uint64_t assoc, uint64_t num_instr_per_cycle, uint64_t cond_branch_per_cycle);
 	~tcm_t();
 	// Search the TCM for a hit
 	// Inputs: pc: PC for the first instruction of the bundle
@@ -68,13 +70,14 @@ public:
 	// Outputs:returns true if TCM hit else returns false
 	// 	   tcm_bundle_length: length of the bundle
 	// 	   tcm_detch_bundle: the non sequential fetch bundle
-	// 	   next_pc: the taken or fall through pc
+	// 	   next_pc: used as fall through pc for call direct and jump, call indirect and return
 	bool lookup(uint64_t pc, uint64_t cb_predictions, uint64_t &tcm_bundle_length, btb_output_t tcm_fetch_bundle[], uint64_t &tcm_next_pc);
 	// Called after btb is hit and fetch bundle is formed
-	void line_fill_buf(uint64_t pc, uint64_t cb_predictions, uint64_t fetch_bundle_length, btb_output_t btb_fetch_bundle[], uint64_t next_pc);//TODO assert while filling line, last_pc == next_pc
+	void line_fill_buffer(uint64_t pc, uint64_t cb_predictions, uint64_t fetch_bundle_length, btb_output_t btb_fetch_bundle[], uint64_t next_pc);//TODO assert while filling line, last_pc == next_pc
 	// At btb_miss, clear the last entry pushed in line fill buffer
-	void rollback_line_fill();
+	//void rollback_line_fill();
 	// At the end of a properly formed fetch bundle, 
 	// commit the last entry pushed in line fill buffer
 	void commit_line_fill();
+	void clear_line_fill();
 };
